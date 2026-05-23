@@ -11,7 +11,7 @@ function formatDuration(seconds: number): string {
 function getZoneBadge(workout: Workout): { label: string; color: string } {
   const name = workout.name.toLowerCase()
   if (name.includes('sweet spot') || name.includes('sweetspot')) return { label: 'Sweet Spot', color: 'bg-yellow-600' }
-  if (name.includes('vo2') || name.includes('v02')) return { label: 'VO2 Max', color: 'bg-red-600' }
+  if (name.includes('vo2')) return { label: 'VO2 Max', color: 'bg-red-600' }
   if (name.includes('tempo')) return { label: 'Tempo', color: 'bg-orange-600' }
   if (name.includes('recovery') || name.includes('easy')) return { label: 'Recovery', color: 'bg-blue-700' }
   if (name.includes('endurance') || name.includes('base') || name.includes('z2')) return { label: 'Endurance', color: 'bg-green-700' }
