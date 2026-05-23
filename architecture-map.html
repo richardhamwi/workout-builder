@@ -205,9 +205,22 @@ const nodes = [
       'Training days: toggle availability + max session length per day',
       'Goals, Constraints, Preferences, Target Events as tag lists',
       'Add tags via Enter key or Add button; remove with ×',
-      'Saves via PUT /api/profile → Upstash Redis',
+      'Saves coaching profile via PUT /api/profile → Upstash Redis',
+      'Saves Gemini + intervals.icu credentials via PUT /api/credentials',
       'Profile is injected verbatim into Coach mode system prompt',
-      'Accessible via sidebar nav on desktop only (BottomNav has 4 primary tabs)',
+    ]
+  },
+  {
+    id: 'page-setup', label: '/setup', sub: 'Setup wizard', layer: 0,
+    desc: 'Step-by-step onboarding for all three required credentials',
+    details: [
+      'Root / checks /api/health server-side → redirects here if anything missing',
+      'Step 1: Upstash Redis — must be env vars, shows exact .env.local snippet',
+      'Step 2: Gemini API key — paste input, saved to Redis via /api/credentials',
+      'Step 3: intervals.icu API key + athlete ID — same Redis storage',
+      'Each step is gated: Step 2 and 3 are disabled until Redis is connected',
+      'Recheck button re-calls /api/health after you restart the dev server',
+      '"Go to Coach →" button appears only when all three are green',
     ]
   },
 
@@ -298,28 +311,51 @@ const nodes = [
       'Plan page reads from here after clearing the localStorage coach handoff',
     ]
   },
+  {
+    id: 'api-credentials', label: 'credentials', sub: '/api/credentials', layer: 1,
+    desc: 'Credential storage for intervals.icu and Gemini — reads/writes via Redis',
+    details: [
+      'GET: returns { hasKey, apiKeyMasked, athleteId, hasGeminiKey, geminiKeyMasked }',
+      'Full key is never returned — last 4 chars only (••••••••xxxx)',
+      'PUT: { apiKey?, athleteId?, geminiKey? } — any combination',
+      'If apiKey/geminiKey starts with ••••, keeps existing value in Redis',
+      'Used by /settings page and /setup wizard',
+    ]
+  },
+  {
+    id: 'api-health', label: 'health', sub: '/api/health', layer: 1,
+    desc: 'Credential health check — returns which services are configured',
+    details: [
+      'GET: returns { redis: bool, gemini: bool, intervals: bool }',
+      '503 if any service is missing, 200 if all connected',
+      'Redis: tries getProfile() — any error → false',
+      'Gemini: checks GEMINI_API_KEY env var first, then Redis (if Redis is up)',
+      'intervals: checks INTERVALS_API_KEY env var first, then Redis',
+      'Called server-side by root / page to decide whether to redirect to /setup',
+    ]
+  },
 
   // ── Library ───────────────────────────────────────────────────────────────
   {
     id: 'lib-gemini', label: 'lib/ai/gemini', sub: 'Gemini Flash client', layer: 2,
     desc: 'Model-agnostic AI client — Gemini 1.5 Flash implementation',
     details: [
-      'Interface: generateText(prompt, systemPrompt?) → Promise<string>',
+      'getModel() is async: checks GEMINI_API_KEY env var, then falls back to Redis',
       'Implementation wraps @google/generative-ai SDK',
       'Model: gemini-1.5-flash (fast, cheap, 1M context)',
       'Model-agnostic design: swap to Claude/GPT-4o by changing this one file',
-      'API key: GEMINI_API_KEY env var (Google AI Studio, free tier)',
+      'Throws descriptive error if no key found in either source',
     ]
   },
   {
     id: 'lib-intervals', label: 'lib/intervals/client', sub: 'intervals.icu SDK', layer: 2,
     desc: 'intervals.icu REST API client — auth, athlete, workouts, events',
     details: [
-      'API key auth: INTERVALS_API_KEY env var (Basic auth header)',
-      'Athlete ID: INTERVALS_ATHLETE_ID env var',
-      'getAthlete() · getWorkouts() · createWorkout(workout)',
+      'getCredentials() is async: checks env vars first, then falls back to Redis',
+      'Env vars: INTERVALS_API_KEY + INTERVALS_ATHLETE_ID override Redis',
+      'getAthleteData() · getWorkouts() · createWorkout(workout, zwoXml)',
       'getEvents(oldest, newest) · createEvent(event)',
-      'CalendarEvent: { id?, start_date_local, name, workout_id?, type }',
+      'Throws descriptive error if no credentials found in either source',
     ]
   },
   {
@@ -328,9 +364,9 @@ const nodes = [
     details: [
       'No persistent TCP connection — works with Vercel serverless functions',
       'getProfile() / setProfile() — key: coaching:profile',
-      'getPlanDraft(id) / setPlanDraft(id, plan) — key: plan:{id}',
-      'listPlanDrafts() — members of plan:index Redis set',
-      'deletePlanDraft(id) — del key + srem from index',
+      'getPlanDraft(id) / setPlanDraft(id, plan) · listPlanDrafts() · deletePlanDraft(id)',
+      'getIntervalsCredentials() / setIntervalsCredentials() — key: intervals:credentials',
+      'getGeminiApiKey() / setGeminiApiKey() — key: gemini:api_key',
     ]
   },
   {
@@ -406,6 +442,9 @@ const edges = [
   { from: 'page-create',   to: 'api-gen-workout',     label: 'POST generate' },
   { from: 'page-library',  to: 'api-workouts',        label: 'GET workouts' },
   { from: 'page-settings', to: 'api-profile',         label: 'GET / PUT' },
+  { from: 'page-settings', to: 'api-credentials',     label: 'GET / PUT' },
+  { from: 'page-setup',    to: 'api-health',          label: 'GET health' },
+  { from: 'page-setup',    to: 'api-credentials',     label: 'PUT credentials' },
 
   // API → Lib
   { from: 'api-chat',           to: 'lib-gemini',    label: 'generateText()' },
@@ -417,6 +456,12 @@ const edges = [
   { from: 'api-events',         to: 'lib-intervals', label: 'get / create' },
   { from: 'api-profile',        to: 'lib-redis',     label: 'get/setProfile()' },
   { from: 'api-drafts',         to: 'lib-redis',     label: 'get/setPlanDraft()' },
+  { from: 'api-credentials',    to: 'lib-redis',     label: 'get/setCreds()' },
+  { from: 'api-health',         to: 'lib-redis',     label: 'connectivity check' },
+
+  // Lib → Lib (credential fallback chains)
+  { from: 'lib-gemini',    to: 'lib-redis',     label: 'API key fallback' },
+  { from: 'lib-intervals', to: 'lib-redis',     label: 'creds fallback' },
 
   // Lib → External
   { from: 'lib-gemini',    to: 'ext-gemini',    label: 'REST API' },
