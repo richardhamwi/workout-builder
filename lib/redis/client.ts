@@ -14,6 +14,7 @@ const PROFILE_KEY = 'coaching:profile'
 const PLAN_KEY_PREFIX = 'plan:'
 const PLAN_INDEX_KEY = 'plan:index'
 const INTERVALS_CREDS_KEY = 'intervals:credentials'
+const GEMINI_KEY = 'gemini:api_key'
 
 export interface IntervalsCredentials {
   apiKey: string
@@ -28,6 +29,16 @@ export async function getIntervalsCredentials(): Promise<IntervalsCredentials | 
 export async function setIntervalsCredentials(creds: IntervalsCredentials): Promise<void> {
   const redis = getRedis()
   await redis.set(INTERVALS_CREDS_KEY, creds)
+}
+
+export async function getGeminiApiKey(): Promise<string | null> {
+  const redis = getRedis()
+  return redis.get<string>(GEMINI_KEY)
+}
+
+export async function setGeminiApiKey(key: string): Promise<void> {
+  const redis = getRedis()
+  await redis.set(GEMINI_KEY, key)
 }
 
 export async function getProfile(): Promise<CoachingProfile | null> {

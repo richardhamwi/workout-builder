@@ -1,9 +1,15 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import type { AIClient, ChatMessage, AthleteData, CoachingProfile, Workout, TrainingPlan, TextEvent } from '@/lib/types'
 
-function getModel() {
-  const apiKey = process.env.GEMINI_API_KEY
-  if (!apiKey) throw new Error('GEMINI_API_KEY not set')
+async function getModel() {
+  let apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) {
+    try {
+      const { getGeminiApiKey } = await import('@/lib/redis/client')
+      apiKey = (await getGeminiApiKey()) ?? undefined
+    } catch { /* Redis not configured */ }
+  }
+  if (!apiKey) throw new Error('Gemini API key not configured. Add it in Settings or set GEMINI_API_KEY in .env.local.')
   const genAI = new GoogleGenerativeAI(apiKey)
   return genAI.getGenerativeModel({ model: 'gemini-1.5-flash' })
 }
@@ -15,7 +21,7 @@ function parseJsonFromResponse(text: string): unknown {
 
 export class GeminiClient implements AIClient {
   async chat(messages: ChatMessage[], systemPrompt: string): Promise<string> {
-    const model = getModel()
+    const model = await getModel()
 
     const history = messages.slice(0, -1).map((m) => ({
       role: m.role === 'user' ? 'user' : 'model',
@@ -37,7 +43,7 @@ export class GeminiClient implements AIClient {
     athleteData: AthleteData,
     profile: CoachingProfile
   ): Promise<Workout> {
-    const model = getModel()
+    const model = await getModel()
     const systemPrompt = buildSystemPrompt(athleteData, profile)
 
     const fullPrompt = `${systemPrompt}
@@ -80,7 +86,7 @@ Respond with ONLY valid JSON matching this structure (no markdown, no explanatio
     athleteData: AthleteData,
     profile: CoachingProfile
   ): Promise<TrainingPlan> {
-    const model = getModel()
+    const model = await getModel()
     const systemPrompt = buildSystemPrompt(athleteData, profile)
 
     const fullPrompt = `${systemPrompt}
@@ -117,7 +123,7 @@ Respond with ONLY valid JSON matching this structure:
   }
 
   async generateTextEvents(workout: Workout): Promise<TextEvent[][]> {
-    const model = getModel()
+    const model = await getModel()
 
     const prompt = `You are a cycling coach authoring in-workout text prompts (textevents) that appear on a rider's screen.
 

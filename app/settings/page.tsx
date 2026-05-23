@@ -53,6 +53,10 @@ export default function SettingsPage() {
   const [apiKey, setApiKey] = useState('')
   const [athleteId, setAthleteId] = useState('')
   const [apiKeyMasked, setApiKeyMasked] = useState('')
+  // Gemini credentials
+  const [geminiKey, setGeminiKey] = useState('')
+  const [geminiKeyMasked, setGeminiKeyMasked] = useState('')
+
   const [credsSaving, setCredsSaving] = useState(false)
   const [credsSaved, setCredsSaved] = useState(false)
   const [credsError, setCredsError] = useState<string | null>(null)
@@ -72,7 +76,7 @@ export default function SettingsPage() {
       fetch('/api/profile').then((r) => r.json()),
       fetch('/api/credentials').then((r) => r.json()),
     ])
-      .then(([profileData, credsData]: [CoachingProfile | null, { hasKey: boolean; apiKeyMasked?: string; athleteId?: string } | null]) => {
+      .then(([profileData, credsData]: [CoachingProfile | null, { hasKey: boolean; apiKeyMasked?: string; athleteId?: string; hasGeminiKey?: boolean; geminiKeyMasked?: string } | null]) => {
         if (profileData) {
           setProfile(profileData)
           setSchedule(
@@ -88,6 +92,7 @@ export default function SettingsPage() {
         }
         if (credsData?.athleteId) setAthleteId(credsData.athleteId)
         if (credsData?.apiKeyMasked) setApiKeyMasked(credsData.apiKeyMasked)
+        if (credsData?.geminiKeyMasked) setGeminiKeyMasked(credsData.geminiKeyMasked)
         setLoading(false)
       })
       .catch(() => setLoading(false))
@@ -101,7 +106,7 @@ export default function SettingsPage() {
       const res = await fetch('/api/credentials', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ apiKey, athleteId }),
+        body: JSON.stringify({ apiKey, athleteId, geminiKey }),
       })
       if (!res.ok) {
         const body = await res.json()
@@ -111,6 +116,10 @@ export default function SettingsPage() {
       if (apiKey && !apiKey.startsWith('••••')) {
         setApiKeyMasked('••••••••' + apiKey.slice(-4))
         setApiKey('')
+      }
+      if (geminiKey && !geminiKey.startsWith('••••')) {
+        setGeminiKeyMasked('••••••••' + geminiKey.slice(-4))
+        setGeminiKey('')
       }
       setTimeout(() => setCredsSaved(false), 3000)
     } catch (err) {
@@ -187,6 +196,38 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      {/* Gemini connection */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-semibold text-sm">Gemini API Key</h2>
+          <p className="text-zinc-500 text-xs mt-1">
+            Powers AI coaching and workout generation. Get a free key at aistudio.google.com.
+          </p>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-xs font-medium text-zinc-400">API Key</label>
+          <input
+            type="password"
+            value={geminiKey}
+            onChange={(e) => setGeminiKey(e.target.value)}
+            placeholder={geminiKeyMasked || 'AIza…'}
+            className="bg-zinc-800 border border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm outline-none font-mono"
+          />
+        </div>
+        {credsError && (
+          <p className="text-red-400 text-xs">{credsError}</p>
+        )}
+        <button
+          onClick={handleCredsSave}
+          disabled={credsSaving || !geminiKey}
+          className="self-start bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+        >
+          {credsSaving ? 'Saving...' : credsSaved ? 'Saved!' : 'Save'}
+        </button>
+      </div>
+
+      <div className="border-t border-zinc-800" />
 
       {/* intervals.icu connection */}
       <div className="flex flex-col gap-4">
