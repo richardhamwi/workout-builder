@@ -134,7 +134,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       {step === 'goals' && (
         <div>
           <h3 className="font-semibold mb-2">What are your training goals?</h3>
-          <p className="text-zinc-400 text-sm mb-4">e.g. "build FTP", "lose weight", "sustain fitness for summer"</p>
+          <p className="text-zinc-400 text-sm mb-4">{'e.g. "build FTP", "lose weight", "sustain fitness for summer"'}</p>
           <div className="flex gap-2 mb-3">
             <input
               className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-sm outline-none border border-zinc-700 focus:border-indigo-500"
@@ -169,7 +169,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       {step === 'constraints' && (
         <div>
           <h3 className="font-semibold mb-2">Any constraints or preferences?</h3>
-          <p className="text-zinc-400 text-sm mb-4">e.g. "time-poor parent", "low motivation for long Zone 2", "indoor only for structured sessions"</p>
+          <p className="text-zinc-400 text-sm mb-4">{'e.g. "time-poor parent", "low motivation for long Zone 2", "indoor only for structured sessions"'}</p>
           <div className="flex gap-2 mb-3">
             <input
               className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-sm outline-none border border-zinc-700 focus:border-indigo-500"
@@ -204,7 +204,7 @@ export function OnboardingForm({ onComplete }: OnboardingFormProps) {
       {step === 'events' && (
         <div>
           <h3 className="font-semibold mb-2">Any target events or races?</h3>
-          <p className="text-zinc-400 text-sm mb-4">Optional. e.g. "Etape du Tour July 2026", "local crit series August"</p>
+          <p className="text-zinc-400 text-sm mb-4">{'Optional. e.g. "Etape du Tour July 2026", "local crit series August"'}</p>
           <div className="flex gap-2 mb-3">
             <input
               className="flex-1 bg-zinc-800 rounded-lg px-3 py-2 text-sm outline-none border border-zinc-700 focus:border-indigo-500"
