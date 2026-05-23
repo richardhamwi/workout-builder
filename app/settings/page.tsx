@@ -4,6 +4,44 @@ import type { CoachingProfile, DaySchedule, DayOfWeek } from '@/lib/types'
 
 const ALL_DAYS: DayOfWeek[] = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
 
+interface TagSectionProps {
+  label: string
+  items: string[]
+  input: string
+  onInputChange: (v: string) => void
+  onAdd: () => void
+  onRemove: (v: string) => void
+  placeholder: string
+}
+
+function TagSection({ label, items, input, onInputChange, onAdd, onRemove, placeholder }: TagSectionProps) {
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-sm font-medium text-zinc-300">{label}</label>
+      <div className="flex gap-2">
+        <input
+          className="flex-1 bg-zinc-800 border border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm outline-none"
+          placeholder={placeholder}
+          value={input}
+          onChange={(e) => onInputChange(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && onAdd()}
+        />
+        <button onClick={onAdd} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 rounded-lg text-sm">
+          Add
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {items.map((item) => (
+          <span key={item} className="bg-zinc-700 text-sm px-3 py-1 rounded-full flex items-center gap-1.5">
+            {item}
+            <button onClick={() => onRemove(item)} className="text-zinc-400 hover:text-white">×</button>
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [profile, setProfile] = useState<CoachingProfile | null>(null)
   const [loading, setLoading] = useState(true)
@@ -93,44 +131,6 @@ export default function SettingsPage() {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
         <div className="text-zinc-500 text-sm">Loading...</div>
-      </div>
-    )
-  }
-
-  function TagSection({
-    label, items, input, onInputChange, onAdd, onRemove, placeholder
-  }: {
-    label: string
-    items: string[]
-    input: string
-    onInputChange: (v: string) => void
-    onAdd: () => void
-    onRemove: (v: string) => void
-    placeholder: string
-  }) {
-    return (
-      <div className="flex flex-col gap-2">
-        <label className="text-sm font-medium text-zinc-300">{label}</label>
-        <div className="flex gap-2">
-          <input
-            className="flex-1 bg-zinc-800 border border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm outline-none"
-            placeholder={placeholder}
-            value={input}
-            onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && onAdd()}
-          />
-          <button onClick={onAdd} className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 rounded-lg text-sm">
-            Add
-          </button>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {items.map((item) => (
-            <span key={item} className="bg-zinc-700 text-sm px-3 py-1 rounded-full flex items-center gap-1.5">
-              {item}
-              <button onClick={() => onRemove(item)} className="text-zinc-400 hover:text-white">×</button>
-            </span>
-          ))}
-        </div>
       </div>
     )
   }

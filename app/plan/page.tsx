@@ -170,7 +170,7 @@ function PushButton({ plan }: { plan: TrainingPlan }) {
 
       const found: ConflictItem[] = []
       for (const session of sessions) {
-        const conflict = existingEvents.find((e) => e.start_date_local === session.date)
+        const conflict = existingEvents.find((e) => e.start_date_local.startsWith(session.date))
         if (conflict) {
           found.push({ session, existingEvent: conflict, choice: 'skip' })
         }
