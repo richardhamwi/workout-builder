@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Workout Builder — Architecture Map</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #09090b;
+  --surface: #111113;
+  --border: #27272a;
+  --text: #f4f4f5;
+  --muted: #52525b;
+  --muted2: #71717a;
+}
+
+html, body { height: 100%; background: var(--bg); color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 14px; overflow: hidden; }
+
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+header {
+  padding: 12px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  flex-shrink: 0; gap: 16px;
+}
+header h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; white-space: nowrap; }
+header .hint { font-size: 11px; color: var(--muted2); }
+header kbd {
+  background: #27272a; padding: 1px 6px; border-radius: 4px;
+  font-size: 10px; font-family: monospace; color: #a1a1aa;
+  border: 1px solid #3f3f46;
+}
+
+#main { display: flex; flex: 1; overflow: hidden; }
+
+#graph-wrap {
+  flex: 1; overflow: auto; position: relative;
+  background-color: var(--bg);
+  background-image: radial-gradient(circle, #27272a 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+#graph { display: block; cursor: default; }
+
+.node-g { transition: opacity 0.18s ease; }
+.node-g:hover .node-hit { opacity: 0.06; }
+.node-hit { fill: white; opacity: 0; transition: opacity 0.15s; }
+
+#panel {
+  width: 300px; flex-shrink: 0; border-left: 1px solid var(--border);
+  background: var(--surface); overflow-y: auto; display: flex;
+  flex-direction: column;
+}
+
+#panel-empty {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 10px; color: var(--muted2);
+  padding: 32px; text-align: center;
+}
+#panel-empty svg { opacity: 0.4; }
+#panel-empty p { font-size: 12px; line-height: 1.6; }
+
+#panel-content { display: none; flex-direction: column; }
+
+.ph { padding: 18px 18px 14px; border-bottom: 1px solid var(--border); }
+.ph-badge {
+  display: inline-block; font-size: 9px; font-weight: 800;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 2px 8px; border-radius: 100px; margin-bottom: 10px;
+}
+.ph-name { font-size: 13px; font-weight: 700; font-family: 'SF Mono','Fira Code',monospace; margin-bottom: 4px; line-height: 1.3; }
+.ph-desc { font-size: 12px; color: var(--muted2); line-height: 1.55; }
+
+.ps { padding: 12px 18px; border-bottom: 1px solid var(--border); }
+.ps-title {
+  font-size: 9px; font-weight: 800; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--muted); margin-bottom: 8px;
+}
+
+.conn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 6px; border-radius: 6px; cursor: pointer;
+  transition: background 0.12s;
+}
+.conn:hover { background: #1c1c1f; }
+.conn-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.conn-label { font-size: 11px; font-family: 'SF Mono','Fira Code',monospace; font-weight: 600; }
+.conn-edge { font-size: 10px; color: var(--muted); margin-left: auto; text-align: right; max-width: 110px; line-height: 1.3; }
+
+.detail-list { list-style: none; display: flex; flex-direction: column; gap: 5px; }
+.detail-list li {
+  font-size: 11px; color: #a1a1aa; line-height: 1.55;
+  padding-left: 14px; position: relative;
+}
+.detail-list li::before { content: '·'; position: absolute; left: 3px; color: var(--muted); }
+
+footer {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 8px 20px; border-top: 1px solid var(--border);
+  flex-shrink: 0; background: var(--surface);
+}
+.leg { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted2); }
+.leg-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+.foot-note { font-size: 11px; color: var(--muted); margin-left: auto; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>Workout Builder — Architecture Map</h1>
+    <span class="hint">Click any node to explore its connections &nbsp;·&nbsp; <kbd>Esc</kbd> to reset</span>
+  </header>
+
+  <div id="main">
+    <div id="graph-wrap">
+      <svg id="graph"></svg>
+    </div>
+
+    <div id="panel">
+      <div id="panel-empty">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <p>Click any node to inspect<br>its connections and details</p>
+      </div>
+      <div id="panel-content"></div>
+    </div>
+  </div>
+
+  <footer>
+    <div class="leg"><div class="leg-dot" style="background:#4338ca"></div>Pages</div>
+    <div class="leg"><div class="leg-dot" style="background:#b45309"></div>API Routes</div>
+    <div class="leg"><div class="leg-dot" style="background:#047857"></div>Library</div>
+    <div class="leg"><div class="leg-dot" style="background:#0369a1"></div>External Services</div>
+    <span class="foot-note">Next.js 14 · TypeScript · Tailwind · Vercel Hobby · $0/month</span>
+  </footer>
+</div>
+
+<script>
+const LAYERS = [
+  { id: 0, name: 'Pages',             y: 100, fill: '#1e1b4b', stroke: '#818cf8', text: '#c7d2fe', badge: '#4338ca' },
+  { id: 1, name: 'API Routes',        y: 270, fill: '#451a03', stroke: '#fbbf24', text: '#fde68a', badge: '#b45309' },
+  { id: 2, name: 'Library',           y: 440, fill: '#022c22', stroke: '#34d399', text: '#a7f3d0', badge: '#047857' },
+  { id: 3, name: 'External Services', y: 580, fill: '#082f49', stroke: '#38bdf8', text: '#bae6fd', badge: '#0369a1' },
+]
+
+const nodes = [
+  // ── Pages ─────────────────────────────────────────────────────────────────
+  {
+    id: 'page-coach', label: '/coach', sub: 'Coach mode', layer: 0,
+    desc: 'AI-powered coaching chat with injected athlete context',
+    details: [
+      'Loads profile + athlete data in parallel on mount (Promise.all)',
+      'Shows OnboardingForm if no coaching profile found in Redis',
+      'FTP, CTL, ATL, TSB stats bar always visible at top',
+      'Quick-start suggestion chips when message history is empty',
+      'Detects {"type":"workout"/"plan",...} JSON in AI response — renders card inline',
+      'Brace-depth scanner parses embedded JSON (not regex) to handle nesting',
+    ]
+  },
+  {
+    id: 'page-plan', label: '/plan', sub: 'Plan mode', layer: 0,
+    desc: 'Multi-week training plan with block view, drill-down, and push',
+    details: [
+      'Reads plan:draft from localStorage on mount (set by Coach mode)',
+      'Falls back to most recent draft from /api/drafts (Upstash)',
+      'BlockView: week grid with focus-based colour coding',
+      'Click week → WeeklyView: 7-column day grid with session slots',
+      'AI adjustment mini-chat: natural language → updated plan JSON',
+      'Push to intervals.icu: conflict detection via date range query, skip/alongside resolution modal',
+    ]
+  },
+  {
+    id: 'page-create', label: '/create', sub: 'Create mode', layer: 0,
+    desc: 'Visual interval builder with drag-and-drop and AI generation',
+    details: [
+      'DnD reordering via @hello-pangea/dnd',
+      'Reads coach:pendingWorkout from localStorage on mount (set by Coach)',
+      'IntervalGraph: live zone-coloured SVG preview (blue/green/yellow/orange/red)',
+      'BlockPalette: SteadyState, IntervalsT, Warmup, Cooldown, Ramp, FreeRide',
+      'TextEventEditor: manual CRUD + AI auto-generate on save',
+      'Saves as .zwo XML to intervals.icu library',
+    ]
+  },
+  {
+    id: 'page-library', label: '/library', sub: 'Library mode', layer: 0,
+    desc: 'Browse all workouts from intervals.icu with search and filters',
+    details: [
+      'Fetches all workouts from intervals.icu on mount',
+      'Client-side search by name',
+      'Filter by zone type (Sweet Spot, VO2, Tempo, Recovery, Endurance)',
+      'Filter by duration bucket (< 30, 30–60, 60–90, 90+ min)',
+      '"Open in Create" → passes workout via localStorage (coach:pendingWorkout)',
+      '"Add to Plan" available when rendered inside Plan swap modal',
+    ]
+  },
+  {
+    id: 'page-settings', label: '/settings', sub: 'Settings', layer: 0,
+    desc: 'Coaching profile editor — the data injected into every AI prompt',
+    details: [
+      'Training days: toggle availability + max session length per day',
+      'Goals, Constraints, Preferences, Target Events as tag lists',
+      'Add tags via Enter key or Add button; remove with ×',
+      'Saves via PUT /api/profile → Upstash Redis',
+      'Profile is injected verbatim into Coach mode system prompt',
+      'Accessible via sidebar nav on desktop only (BottomNav has 4 primary tabs)',
+    ]
+  },
+
+  // ── API Routes ─────────────────────────────────────────────────────────────
+  {
+    id: 'api-chat', label: 'ai/chat', sub: '/api/ai/chat', layer: 1,
+    desc: 'AI conversation endpoint — accepts full chat history + system prompt',
+    details: [
+      'POST: { messages: ChatMessage[], systemPrompt: string }',
+      'Returns { content: string } — full response, not streaming',
+      'Used by Coach mode (coaching chat) and Plan mode (AI adjustment)',
+      'System prompt injection: FTP/weight, CTL/ATL/TSB, 14-day activity log, full profile',
+      'Model-agnostic: calls lib/ai/gemini → easy to swap to Claude or GPT-4o',
+    ]
+  },
+  {
+    id: 'api-gen-workout', label: 'gen-workout', sub: '/api/ai/generate-workout', layer: 1,
+    desc: 'Generates a structured workout from a natural-language prompt',
+    details: [
+      'POST: { prompt, ftp, durationMinutes }',
+      'Returns Workout JSON with blocks[] array',
+      'Called by Create mode "Generate with AI" button',
+      'AI must return valid block types with FTP-relative power values',
+    ]
+  },
+  {
+    id: 'api-gen-textevents', label: 'gen-textevents', sub: '/api/ai/generate-textevents', layer: 1,
+    desc: 'Generates timed coaching textevents for .zwo files',
+    details: [
+      'POST: { blocks: WorkoutBlock[] }',
+      'Returns TextEvent[]: { message, timeoffset, duration }',
+      'Density rules: <3 min = 1–2 events, 3–10 min = 2–3, 10+ min = 3–4',
+      'Categories: Physiology (primary), Motivation (primary), Technique, Pacing, Recovery, Nutrition (60+ min only)',
+      'Baked at creation time — not dynamic. Dynamic textevents = v2 feature',
+    ]
+  },
+  {
+    id: 'api-athlete', label: 'athlete', sub: '/api/intervals/athlete', layer: 1,
+    desc: 'Athlete data proxy — FTP, form metrics, recent activity history',
+    details: [
+      'GET: no params',
+      'Returns AthleteData: ftp, weight, ctl, atl, tsb, name',
+      'recentActivities[]: date, type, durationSeconds, tss, averageHR',
+      'Proxies intervals.icu /athlete/{id} REST endpoint',
+      'Validated: throws if r.ok is false (prevents error object stored as AthleteData)',
+    ]
+  },
+  {
+    id: 'api-workouts', label: 'workouts', sub: '/api/intervals/workouts', layer: 1,
+    desc: 'Workout library — list and save. intervals.icu is the source of truth.',
+    details: [
+      'GET: returns all workouts from intervals.icu',
+      'POST: saves workout → generates .zwo XML via lib/zwo/generator → uploads',
+      'No local storage — intervals.icu is the authoritative library',
+      '.zwo generator handles all block types + embeds textevents',
+    ]
+  },
+  {
+    id: 'api-events', label: 'events', sub: '/api/intervals/events', layer: 1,
+    desc: 'Calendar events — conflict detection before push, then push',
+    details: [
+      'GET ?oldest=YYYY-MM-DD&newest=YYYY-MM-DD: fetch events in date range',
+      'POST: create calendar event with start_date_local, name, workout_id, type',
+      'Conflict detection: .startsWith(date) comparison (events have datetime, sessions have date)',
+      'Plan push: one POST per non-skipped session, run in parallel',
+      'Event type: "Ride" | "Note"',
+    ]
+  },
+  {
+    id: 'api-profile', label: 'profile', sub: '/api/profile', layer: 1,
+    desc: 'Coaching profile CRUD — stored in Upstash Redis',
+    details: [
+      'GET: load profile from Redis (key: coaching:profile)',
+      'PUT: save updated profile to Redis',
+      'Profile: availableDays[], goals[], constraints[], preferences[], targetEvents[]',
+      'Injected into every Coach mode system prompt',
+      'Onboarding writes here; Settings page reads + writes here',
+    ]
+  },
+  {
+    id: 'api-drafts', label: 'drafts', sub: '/api/drafts', layer: 1,
+    desc: 'Plan draft storage — persists training plans between sessions',
+    details: [
+      'GET: list all drafts (sorted by createdAt desc) or GET ?id= for one',
+      'POST: save plan draft — upsert by plan.id',
+      'DELETE ?id=: remove draft and index entry',
+      'Plan:index Redis set tracks all draft IDs for fast list operations',
+      'Plan page reads from here after clearing the localStorage coach handoff',
+    ]
+  },
+
+  // ── Library ───────────────────────────────────────────────────────────────
+  {
+    id: 'lib-gemini', label: 'lib/ai/gemini', sub: 'Gemini Flash client', layer: 2,
+    desc: 'Model-agnostic AI client — Gemini 1.5 Flash implementation',
+    details: [
+      'Interface: generateText(prompt, systemPrompt?) → Promise<string>',
+      'Implementation wraps @google/generative-ai SDK',
+      'Model: gemini-1.5-flash (fast, cheap, 1M context)',
+      'Model-agnostic design: swap to Claude/GPT-4o by changing this one file',
+      'API key: GEMINI_API_KEY env var (Google AI Studio, free tier)',
+    ]
+  },
+  {
+    id: 'lib-intervals', label: 'lib/intervals/client', sub: 'intervals.icu SDK', layer: 2,
+    desc: 'intervals.icu REST API client — auth, athlete, workouts, events',
+    details: [
+      'API key auth: INTERVALS_API_KEY env var (Basic auth header)',
+      'Athlete ID: INTERVALS_ATHLETE_ID env var',
+      'getAthlete() · getWorkouts() · createWorkout(workout)',
+      'getEvents(oldest, newest) · createEvent(event)',
+      'CalendarEvent: { id?, start_date_local, name, workout_id?, type }',
+    ]
+  },
+  {
+    id: 'lib-redis', label: 'lib/redis/client', sub: 'Upstash Redis', layer: 2,
+    desc: 'Upstash Redis client — serverless-friendly, REST-based key-value store',
+    details: [
+      'No persistent TCP connection — works with Vercel serverless functions',
+      'getProfile() / setProfile() — key: coaching:profile',
+      'getPlanDraft(id) / setPlanDraft(id, plan) — key: plan:{id}',
+      'listPlanDrafts() — members of plan:index Redis set',
+      'deletePlanDraft(id) — del key + srem from index',
+    ]
+  },
+  {
+    id: 'lib-zwo', label: 'lib/zwo/generator', sub: 'ZWO XML generator', layer: 2,
+    desc: 'Generates Zwift-compatible .zwo XML from the internal Workout type',
+    details: [
+      'Supports: Warmup, SteadyState, IntervalsT, Ramp, FreeRide, Cooldown',
+      'Cooldown quirk: Zwift uses PowerHigh for start (high) and PowerLow for end — inverted',
+      'IntervalsT: duration is computed (repeat × (onDuration + offDuration))',
+      'Embeds <textevent> elements with timeoffset + duration attributes',
+      '14 test cases covering all block types and edge cases',
+    ]
+  },
+  {
+    id: 'lib-types', label: 'lib/types', sub: 'TypeScript types', layer: 2,
+    desc: 'Shared TypeScript types — single source of truth across all layers',
+    details: [
+      'Workout, WorkoutBlock (SteadyState | IntervalsT | Warmup | Cooldown | Ramp | FreeRide), TextEvent',
+      'TrainingPlan, PlanWeek, PlanSession',
+      'CoachingProfile, DaySchedule, DayOfWeek',
+      'AthleteData, Activity',
+      'ChatMessage: { id, role, content, timestamp }',
+    ]
+  },
+
+  // ── External ──────────────────────────────────────────────────────────────
+  {
+    id: 'ext-intervals', label: 'intervals.icu', sub: 'Training platform', layer: 3,
+    desc: 'Source of truth for workouts, calendar, and athlete metrics',
+    details: [
+      'Workout library: all structured sessions stored as .zwo',
+      'Training calendar: sessions with workout references and dates',
+      'Athlete metrics: FTP, CTL (fitness), ATL (fatigue), TSB (form) — recalculated daily',
+      'Activity history: last N days with TSS, HR, duration, type',
+      'Free plan has API rate limits — ~5 workout creates/day',
+    ]
+  },
+  {
+    id: 'ext-gemini', label: 'Gemini Flash', sub: 'Google AI Studio', layer: 3,
+    desc: 'AI model — fast, cheap, 1,500 free requests/day',
+    details: [
+      'Model: gemini-1.5-flash — 1M context window, multimodal',
+      'Free tier via Google AI Studio: 1,500 req/day, 15 RPM',
+      'Used for: coaching chat, workout generation, plan generation, textevents',
+      'API key: GEMINI_API_KEY from Google AI Studio (aistudio.google.com)',
+      'Model-agnostic client makes swapping to Claude or GPT-4o a one-file change',
+    ]
+  },
+  {
+    id: 'ext-redis', label: 'Upstash Redis', sub: 'Serverless KV store', layer: 3,
+    desc: 'Serverless Redis — free tier, REST API, no connection pooling needed',
+    details: [
+      'REST API — perfect for Vercel serverless (no persistent connection)',
+      'Stores: coaching profile + plan drafts',
+      'Free tier: 10,000 commands/day, 256 MB max data',
+      'Env vars: UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN',
+      'Total infrastructure cost: $0/month',
+    ]
+  },
+]
+
+const edges = [
+  // Pages → API
+  { from: 'page-coach',    to: 'api-profile',        label: 'GET profile' },
+  { from: 'page-coach',    to: 'api-athlete',         label: 'GET athlete' },
+  { from: 'page-coach',    to: 'api-chat',            label: 'POST messages' },
+  { from: 'page-plan',     to: 'api-drafts',          label: 'GET / POST' },
+  { from: 'page-plan',     to: 'api-workouts',        label: 'GET (swap)' },
+  { from: 'page-plan',     to: 'api-events',          label: 'GET / POST' },
+  { from: 'page-plan',     to: 'api-chat',            label: 'POST (adjust)' },
+  { from: 'page-create',   to: 'api-workouts',        label: 'POST save' },
+  { from: 'page-create',   to: 'api-gen-textevents',  label: 'POST textevents' },
+  { from: 'page-create',   to: 'api-gen-workout',     label: 'POST generate' },
+  { from: 'page-library',  to: 'api-workouts',        label: 'GET workouts' },
+  { from: 'page-settings', to: 'api-profile',         label: 'GET / PUT' },
+
+  // API → Lib
+  { from: 'api-chat',           to: 'lib-gemini',    label: 'generateText()' },
+  { from: 'api-gen-workout',    to: 'lib-gemini',    label: 'generateText()' },
+  { from: 'api-gen-textevents', to: 'lib-gemini',    label: 'generateText()' },
+  { from: 'api-athlete',        to: 'lib-intervals', label: 'getAthlete()' },
+  { from: 'api-workouts',       to: 'lib-intervals', label: 'get / create' },
+  { from: 'api-workouts',       to: 'lib-zwo',       label: 'generateZwo()' },
+  { from: 'api-events',         to: 'lib-intervals', label: 'get / create' },
+  { from: 'api-profile',        to: 'lib-redis',     label: 'get/setProfile()' },
+  { from: 'api-drafts',         to: 'lib-redis',     label: 'get/setPlanDraft()' },
+
+  // Lib → External
+  { from: 'lib-gemini',    to: 'ext-gemini',    label: 'REST API' },
+  { from: 'lib-intervals', to: 'ext-intervals', label: 'REST API' },
+  { from: 'lib-redis',     to: 'ext-redis',     label: 'REST API' },
+]
+
+// ── Layout ─────────────────────────────────────────────────────────────────
+const NW = 124, NH = 44, PAD_X = 80, PAD_Y = 36, MIN_SVG_W = 1180
+
+function layout() {
+  const wrap = document.getElementById('graph-wrap')
+  const svgW = Math.max(wrap.clientWidth - 1, MIN_SVG_W)
+
+  const byLayer = {}
+  nodes.forEach(n => { (byLayer[n.layer] = byLayer[n.layer] || []).push(n) })
+
+  Object.entries(byLayer).forEach(([li, ns]) => {
+    const usable = svgW - PAD_X * 2
+    const step = usable / ns.length
+    ns.forEach((n, i) => {
+      n.x = PAD_X + step * i + (step - NW) / 2
+      n.y = LAYERS[+li].y
+    })
+  })
+
+  const lastY = LAYERS[LAYERS.length - 1].y
+  const svgH = lastY + NH + PAD_Y + 16
+
+  const svg = document.getElementById('graph')
+  svg.setAttribute('width', svgW)
+  svg.setAttribute('height', svgH)
+  return { svgW, svgH }
+}
+
+// ── State ──────────────────────────────────────────────────────────────────
+let sel = null
+
+function byId(id) { return nodes.find(n => n.id === id) }
+function connectedEdges(id) { return edges.filter(e => e.from === id || e.to === id) }
+function neighbors(id) {
+  const s = new Set()
+  connectedEdges(id).forEach(e => { s.add(e.from); s.add(e.to) })
+  s.delete(id)
+  return s
+}
+
+// ── Render ─────────────────────────────────────────────────────────────────
+const NS = 'http://www.w3.org/2000/svg'
+function el(tag, attrs = {}) {
+  const e = document.createElementNS(NS, tag)
+  Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v))
+  return e
+}
+
+function bezier(a, b) {
+  const ax = a.x + NW / 2, ay = a.y + NH
+  const bx = b.x + NW / 2, by = b.y
+  const my = ay + (by - ay) * 0.48
+  return `M ${ax} ${ay} C ${ax} ${my}, ${bx} ${my}, ${bx} ${by}`
+}
+
+function render() {
+  const { svgW } = layout()
+  const svg = document.getElementById('graph')
+  svg.innerHTML = ''
+
+  // Defs — arrowhead markers
+  const defs = el('defs')
+  LAYERS.forEach(lr => {
+    ;[['', lr.stroke, 0.55], ['-hi', '#fff', 1], ['-nb', lr.stroke, 0.35]].forEach(([sfx, color, op]) => {
+      const m = el('marker', { id: `arr${lr.id}${sfx}`, markerWidth: 8, markerHeight: 8, refX: 7, refY: 3, orient: 'auto' })
+      const p = el('polygon', { points: '0 0, 8 3, 0 6', fill: color, opacity: op })
+      m.appendChild(p); defs.appendChild(m)
+    })
+  })
+  svg.appendChild(defs)
+
+  // Layer labels + rules
+  LAYERS.forEach(lr => {
+    const ry = lr.y - 20
+    svg.appendChild(el('line', { x1: 0, y1: ry, x2: svgW, y2: ry, stroke: '#27272a', 'stroke-width': 1 }))
+    const t = el('text', { x: 10, y: lr.y - 6, fill: lr.stroke, 'font-size': 9, 'font-weight': 800,
+      'letter-spacing': '0.09em', 'font-family': '-apple-system, sans-serif' })
+    t.textContent = lr.name.toUpperCase()
+    svg.appendChild(t)
+  })
+
+  // Determine opacity state
+  const nbSet = sel ? neighbors(sel) : new Set()
+  const selEdges = sel ? new Set(connectedEdges(sel).map(e => `${e.from}|${e.to}`)) : new Set()
+
+  // Edges
+  edges.forEach(e => {
+    const a = byId(e.from), b = byId(e.to)
+    if (!a || !b) return
+    const key = `${e.from}|${e.to}`
+    const isHi = sel && selEdges.has(key)
+    const isDim = sel && !isHi
+    const toLr = LAYERS[b.layer]
+
+    const p = el('path', {
+      d: bezier(a, b), fill: 'none',
+      stroke: isHi ? '#fff' : toLr.stroke,
+      'stroke-width': isHi ? 2.5 : 1.5,
+      opacity: isDim ? 0.04 : (sel ? 0.9 : 0.22),
+      'marker-end': isHi ? `url(#arr${b.layer}-hi)` : `url(#arr${b.layer}${isDim ? '-nb' : ''})`,
+    })
+    svg.appendChild(p)
+  })
+
+  // Nodes
+  nodes.forEach(n => {
+    const lr = LAYERS[n.layer]
+    const isSelected = sel === n.id
+    const isNb = nbSet.has(n.id)
+    const dim = sel && !isSelected && !isNb
+
+    const g = el('g', { 'class': 'node-g', opacity: dim ? 0.1 : 1, cursor: 'pointer', 'data-id': n.id })
+
+    // Selection / neighbor ring
+    if (isSelected) {
+      g.appendChild(el('rect', { x: n.x - 5, y: n.y - 5, width: NW + 10, height: NH + 10, rx: 12,
+        fill: 'none', stroke: '#fff', 'stroke-width': 2, opacity: 0.55 }))
+    } else if (isNb && sel) {
+      g.appendChild(el('rect', { x: n.x - 3, y: n.y - 3, width: NW + 6, height: NH + 6, rx: 11,
+        fill: 'none', stroke: lr.stroke, 'stroke-width': 1.5, opacity: 0.6 }))
+    }
+
+    // Node body
+    g.appendChild(el('rect', { x: n.x, y: n.y, width: NW, height: NH, rx: 8,
+      fill: isSelected ? lr.stroke : lr.fill,
+      stroke: lr.stroke, 'stroke-width': isSelected ? 0 : 1, 'stroke-opacity': 0.55 }))
+
+    // Label
+    const lbl = el('text', { x: n.x + NW / 2, y: n.y + (n.sub ? 16 : 23), 'text-anchor': 'middle',
+      fill: isSelected ? '#fff' : lr.text, 'font-size': 11, 'font-weight': 700,
+      'font-family': "'SF Mono','Fira Code','Cascadia Code',monospace" })
+    lbl.textContent = n.label
+    g.appendChild(lbl)
+
+    if (n.sub) {
+      const sub = el('text', { x: n.x + NW / 2, y: n.y + 31, 'text-anchor': 'middle',
+        fill: isSelected ? 'rgba(255,255,255,0.65)' : lr.stroke, 'font-size': 9,
+        'font-family': '-apple-system, sans-serif', opacity: 0.75 })
+      sub.textContent = n.sub
+      g.appendChild(sub)
+    }
+
+    // Invisible hit target (full node)
+    const hit = el('rect', { x: n.x, y: n.y, width: NW, height: NH, rx: 8,
+      fill: 'transparent', 'class': 'node-hit' })
+    g.appendChild(hit)
+
+    g.addEventListener('click', ev => {
+      ev.stopPropagation()
+      sel = sel === n.id ? null : n.id
+      render(); updatePanel()
+    })
+
+    svg.appendChild(g)
+  })
+
+}
+
+// ── Panel ──────────────────────────────────────────────────────────────────
+function updatePanel() {
+  const empty = document.getElementById('panel-empty')
+  const content = document.getElementById('panel-content')
+
+  if (!sel) {
+    empty.style.display = 'flex'; content.style.display = 'none'; return
+  }
+  empty.style.display = 'none'; content.style.display = 'flex'
+
+  const n = byId(sel)
+  const lr = LAYERS[n.layer]
+  const lnames = ['Page', 'API Route', 'Library', 'External']
+
+  const up   = edges.filter(e => e.to   === sel).map(e => ({ n: byId(e.from), e })).filter(x => x.n)
+  const down = edges.filter(e => e.from === sel).map(e => ({ n: byId(e.to),   e })).filter(x => x.n)
+
+  const connHTML = ({ n: cn, e }) => {
+    const cl = LAYERS[cn.layer]
+    return `<div class="conn" onclick="selectNode('${cn.id}')">
+      <div class="conn-dot" style="background:${cl.stroke}"></div>
+      <span class="conn-label" style="color:${cl.text}">${cn.label}</span>
+      <span class="conn-edge">${e.label}</span>
+    </div>`
+  }
+
+  content.innerHTML = `
+    <div class="ph">
+      <div class="ph-badge" style="background:${lr.badge};color:${lr.text}">${lnames[n.layer]}</div>
+      <div class="ph-name" style="color:${lr.text}">${n.sub || n.label}</div>
+      <div class="ph-desc">${n.desc}</div>
+    </div>
+    ${up.length ? `<div class="ps">
+      <div class="ps-title">Called by &nbsp;(${up.length})</div>
+      ${up.map(connHTML).join('')}
+    </div>` : ''}
+    ${down.length ? `<div class="ps">
+      <div class="ps-title">Calls &nbsp;(${down.length})</div>
+      ${down.map(connHTML).join('')}
+    </div>` : ''}
+    ${n.details?.length ? `<div class="ps">
+      <div class="ps-title">Details</div>
+      <ul class="detail-list">${n.details.map(d => `<li>${d}</li>`).join('')}</ul>
+    </div>` : ''}
+  `
+}
+
+window.selectNode = id => { sel = id; render(); updatePanel() }
+
+// ── Background click → deselect ────────────────────────────────────────────
+document.getElementById('graph').addEventListener('click', () => {
+  sel = null; render(); updatePanel()
+})
+
+// ── Keyboard + Resize ──────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') { sel = null; render(); updatePanel() }
+})
+
+let resizeT
+window.addEventListener('resize', () => {
+  clearTimeout(resizeT)
+  resizeT = setTimeout(() => { render(); updatePanel() }, 80)
+})
+
+// ── Boot ───────────────────────────────────────────────────────────────────
+render()
+updatePanel()
+</script>
+</body>
+</html>
