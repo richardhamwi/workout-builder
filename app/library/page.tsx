@@ -30,9 +30,14 @@ export default function LibraryPage() {
 
   useEffect(() => {
     fetch('/api/intervals/workouts')
-      .then((r) => r.json())
+      .then(async (r) => {
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error ?? 'Failed to load workouts')
+        if (!Array.isArray(data)) throw new Error('Unexpected response from workouts API')
+        return data
+      })
       .then((data) => { setWorkouts(data); setLoading(false) })
-      .catch(() => { setError('Failed to load workouts'); setLoading(false) })
+      .catch((err) => { setError(err.message); setLoading(false) })
   }, [])
 
   const filtered = useMemo(() => {
