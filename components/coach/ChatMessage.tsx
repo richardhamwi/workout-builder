@@ -3,18 +3,55 @@ import type { ChatMessage as ChatMessageType, Workout, TrainingPlan } from '@/li
 import { GeneratedWorkoutCard } from './GeneratedWorkoutCard'
 
 function extractStructured(content: string): { type: 'workout'; data: Workout } | { type: 'plan'; data: TrainingPlan } | null {
-  const match = content.match(/\{["']type["']\s*:\s*["'](workout|plan)["'][\s\S]*?\}/)
-  if (!match) return null
-  try {
-    const parsed = JSON.parse(match[0])
-    if (parsed.type === 'workout' && parsed.data) return { type: 'workout', data: parsed.data }
-    if (parsed.type === 'plan' && parsed.data) return { type: 'plan', data: parsed.data }
-  } catch { /* ignore */ }
+  // Find the start of a JSON object that begins with "type":"workout" or "type":"plan"
+  const startPattern = /\{["']type["']\s*:\s*["'](workout|plan)["']/g
+  let match: RegExpExecArray | null
+  while ((match = startPattern.exec(content)) !== null) {
+    const start = match.index
+    let depth = 0
+    let end = -1
+    for (let i = start; i < content.length; i++) {
+      if (content[i] === '{') depth++
+      else if (content[i] === '}') {
+        depth--
+        if (depth === 0) { end = i; break }
+      }
+    }
+    if (end === -1) continue
+    try {
+      const parsed = JSON.parse(content.slice(start, end + 1))
+      if (parsed.type === 'workout' && parsed.data) return { type: 'workout', data: parsed.data }
+      if (parsed.type === 'plan' && parsed.data) return { type: 'plan', data: parsed.data }
+    } catch { /* malformed JSON, try next match */ }
+  }
   return null
 }
 
 function cleanContent(content: string): string {
-  return content.replace(/\{["']type["']\s*:\s*["'](workout|plan)["'][\s\S]*?\}\s*/g, '').trim()
+  // Remove the same JSON blobs that extractStructured would find
+  const startPattern = /\{["']type["']\s*:\s*["'](workout|plan)["']/g
+  let result = content
+  let match: RegExpExecArray | null
+  const toRemove: Array<[number, number]> = []
+  while ((match = startPattern.exec(content)) !== null) {
+    const start = match.index
+    let depth = 0
+    let end = -1
+    for (let i = start; i < content.length; i++) {
+      if (content[i] === '{') depth++
+      else if (content[i] === '}') {
+        depth--
+        if (depth === 0) { end = i; break }
+      }
+    }
+    if (end !== -1) toRemove.push([start, end + 1])
+  }
+  // Remove in reverse order to preserve indices
+  for (let i = toRemove.length - 1; i >= 0; i--) {
+    const [s, e] = toRemove[i]
+    result = result.slice(0, s) + result.slice(e)
+  }
+  return result.trim()
 }
 
 interface ChatMessageProps {
@@ -61,8 +98,10 @@ export function ChatMessageBubble({ message }: ChatMessageProps) {
             <p className="text-xs text-zinc-500 mt-1">{structured.data.description}</p>
             <button
               onClick={() => {
-                localStorage.setItem('plan:draft', JSON.stringify(structured.data))
-                window.location.href = '/plan'
+                if (typeof window !== 'undefined') {
+                  localStorage.setItem('plan:draft', JSON.stringify(structured.data))
+                  window.location.href = '/plan'
+                }
               }}
               className="mt-3 text-xs bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg"
             >

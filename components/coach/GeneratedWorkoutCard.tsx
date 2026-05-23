@@ -58,7 +58,9 @@ export function GeneratedWorkoutCard({ workout: initialWorkout }: GeneratedWorko
   }
 
   function openInCreate() {
-    localStorage.setItem('coach:pendingWorkout', JSON.stringify(initialWorkout))
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('coach:pendingWorkout', JSON.stringify(initialWorkout))
+    }
     router.push('/create')
   }
 

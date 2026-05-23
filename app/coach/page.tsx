@@ -15,7 +15,10 @@ export default function CoachPage() {
   useEffect(() => {
     Promise.all([
       fetch('/api/profile').then((r) => r.json()),
-      fetch('/api/intervals/athlete').then((r) => r.json()),
+      fetch('/api/intervals/athlete').then(async (r) => {
+        if (!r.ok) throw new Error(`Athlete data fetch failed: ${r.status}`)
+        return r.json()
+      }),
     ])
       .then(([prof, athlete]) => {
         setAthleteData(athlete)
@@ -26,8 +29,8 @@ export default function CoachPage() {
           setState('ready')
         }
       })
-      .catch((err) => {
-        setError(err.message ?? 'Failed to load data')
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : 'Failed to load data')
         setState('error')
       })
   }, [])
