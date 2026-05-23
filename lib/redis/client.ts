@@ -13,6 +13,22 @@ function getRedis(): Redis {
 const PROFILE_KEY = 'coaching:profile'
 const PLAN_KEY_PREFIX = 'plan:'
 const PLAN_INDEX_KEY = 'plan:index'
+const INTERVALS_CREDS_KEY = 'intervals:credentials'
+
+export interface IntervalsCredentials {
+  apiKey: string
+  athleteId: string
+}
+
+export async function getIntervalsCredentials(): Promise<IntervalsCredentials | null> {
+  const redis = getRedis()
+  return redis.get<IntervalsCredentials>(INTERVALS_CREDS_KEY)
+}
+
+export async function setIntervalsCredentials(creds: IntervalsCredentials): Promise<void> {
+  const redis = getRedis()
+  await redis.set(INTERVALS_CREDS_KEY, creds)
+}
 
 export async function getProfile(): Promise<CoachingProfile | null> {
   const redis = getRedis()

@@ -49,6 +49,14 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // intervals.icu credentials
+  const [apiKey, setApiKey] = useState('')
+  const [athleteId, setAthleteId] = useState('')
+  const [apiKeyMasked, setApiKeyMasked] = useState('')
+  const [credsSaving, setCredsSaving] = useState(false)
+  const [credsSaved, setCredsSaved] = useState(false)
+  const [credsError, setCredsError] = useState<string | null>(null)
+
   const [schedule, setSchedule] = useState<DaySchedule[]>([])
   const [goals, setGoals] = useState<string[]>([])
   const [goalInput, setGoalInput] = useState('')
@@ -60,26 +68,57 @@ export default function SettingsPage() {
   const [eventInput, setEventInput] = useState('')
 
   useEffect(() => {
-    fetch('/api/profile')
-      .then((r) => r.json())
-      .then((data: CoachingProfile | null) => {
-        if (data) {
-          setProfile(data)
+    Promise.all([
+      fetch('/api/profile').then((r) => r.json()),
+      fetch('/api/credentials').then((r) => r.json()),
+    ])
+      .then(([profileData, credsData]: [CoachingProfile | null, { hasKey: boolean; apiKeyMasked?: string; athleteId?: string } | null]) => {
+        if (profileData) {
+          setProfile(profileData)
           setSchedule(
             ALL_DAYS.map((day) => {
-              const existing = data.availableDays.find((d) => d.day === day)
+              const existing = profileData.availableDays.find((d) => d.day === day)
               return existing ?? { day, available: false, maxSessionMinutes: 60 }
             })
           )
-          setGoals(data.goals)
-          setConstraints(data.constraints)
-          setPreferences(data.preferences)
-          setTargetEvents(data.targetEvents)
+          setGoals(profileData.goals)
+          setConstraints(profileData.constraints)
+          setPreferences(profileData.preferences)
+          setTargetEvents(profileData.targetEvents)
         }
+        if (credsData?.athleteId) setAthleteId(credsData.athleteId)
+        if (credsData?.apiKeyMasked) setApiKeyMasked(credsData.apiKeyMasked)
         setLoading(false)
       })
       .catch(() => setLoading(false))
   }, [])
+
+  async function handleCredsSave() {
+    setCredsSaving(true)
+    setCredsError(null)
+    setCredsSaved(false)
+    try {
+      const res = await fetch('/api/credentials', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey, athleteId }),
+      })
+      if (!res.ok) {
+        const body = await res.json()
+        throw new Error(body.error ?? 'Save failed')
+      }
+      setCredsSaved(true)
+      if (apiKey && !apiKey.startsWith('••••')) {
+        setApiKeyMasked('••••••••' + apiKey.slice(-4))
+        setApiKey('')
+      }
+      setTimeout(() => setCredsSaved(false), 3000)
+    } catch (err) {
+      setCredsError(err instanceof Error ? err.message : 'Save failed')
+    } finally {
+      setCredsSaving(false)
+    }
+  }
 
   function toggleDay(day: DayOfWeek) {
     setSchedule((s) => s.map((d) => (d.day === day ? { ...d, available: !d.available } : d)))
@@ -148,6 +187,54 @@ export default function SettingsPage() {
           </p>
         )}
       </div>
+
+      {/* intervals.icu connection */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h2 className="font-semibold text-sm">intervals.icu Connection</h2>
+          <p className="text-zinc-500 text-xs mt-1">
+            Your API key is stored securely in Redis. Env vars override these settings if set.
+          </p>
+        </div>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-400">API Key</label>
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              placeholder={apiKeyMasked || 'Paste your API key from intervals.icu → Settings → API'}
+              className="bg-zinc-800 border border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm outline-none font-mono"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-zinc-400">Athlete ID</label>
+            <input
+              type="text"
+              value={athleteId}
+              onChange={(e) => setAthleteId(e.target.value)}
+              placeholder="e.g. i123456"
+              className="bg-zinc-800 border border-zinc-700 focus:border-indigo-500 rounded-lg px-3 py-2 text-sm outline-none font-mono"
+            />
+            <p className="text-zinc-600 text-xs">Find your athlete ID in the intervals.icu URL: intervals.icu/athlete/<strong>i123456</strong></p>
+          </div>
+        </div>
+        {credsError && (
+          <p className="text-red-400 text-xs">{credsError}</p>
+        )}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleCredsSave}
+            disabled={credsSaving || (!apiKey && !athleteId)}
+            className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white px-5 py-2 rounded-lg text-sm font-medium transition-colors"
+          >
+            {credsSaving ? 'Saving...' : credsSaved ? 'Saved!' : 'Save connection'}
+          </button>
+          {credsSaved && <p className="text-green-400 text-sm">Connection updated.</p>}
+        </div>
+      </div>
+
+      <div className="border-t border-zinc-800" />
 
       <div className="flex flex-col gap-3">
         <h2 className="font-semibold text-sm">Training Days</h2>

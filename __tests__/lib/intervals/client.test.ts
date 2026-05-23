@@ -48,7 +48,7 @@ describe('getAthleteData', () => {
 
   it('throws if INTERVALS_API_KEY is missing', async () => {
     delete process.env.INTERVALS_API_KEY
-    await expect(getAthleteData()).rejects.toThrow('INTERVALS_API_KEY not set')
+    await expect(getAthleteData()).rejects.toThrow('intervals.icu credentials not configured')
   })
 })
 
